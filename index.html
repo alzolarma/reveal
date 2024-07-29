@@ -35,28 +35,69 @@
         <div id="message"></div>
     </body>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+      document.addEventListener('DOMContentLoaded', () => {
             const scratchCards = document.querySelectorAll('.scratch-card');
             const message = document.getElementById('message');
             let isDrawing = false;
 
-            const genders = Array.from(scratchCards).map(card => card.dataset.gender || "");
+            const startDrawing = () => isDrawing = true;
+            const endDrawing = (ctx) => {
+                isDrawing = false;
+                ctx.beginPath();
+            };
 
-            scratchCards.forEach((card, index) => {
+            const draw = (event, ctx, card) => {
+                if (!isDrawing) return;
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.lineWidth = 15;
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = 'rgba(0,0,0,1)';
+
+                const rect = card.getBoundingClientRect();
+                const clientX = event.clientX || event.touches[0].clientX;
+                const clientY = event.clientY || event.touches[0].clientY;
+
+                ctx.lineTo(clientX - rect.left, clientY - rect.top);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(clientX - rect.left, clientY - rect.top);
+
+                const imageData = ctx.getImageData(0, 0, card.width, card.height);
+                let revealedPixels = 0;
+                for (let i = 0; i < imageData.data.length; i += 4) {
+                    if (imageData.data[i + 3] === 0) revealedPixels++;
+                }
+
+                if (revealedPixels / (card.width * card.height) > 0.5) {
+                    ctx.clearRect(0, 0, card.width, card.height);
+                    ctx.drawImage(card.hiddenCanvas, 0, 0);
+
+                    card.removeEventListener('mousedown', card.startDrawing);
+                    card.removeEventListener('mouseup', card.endDrawing);
+                    card.removeEventListener('mousemove', card.draw);
+                    card.removeEventListener('mouseout', card.endDrawing);
+                    card.removeEventListener('touchstart', card.startDrawing);
+                    card.removeEventListener('touchend', card.endDrawing);
+                    card.removeEventListener('touchmove', card.draw);
+
+                    const revealedBoys = Array.from(scratchCards)
+                        .filter(card => card.dataset.gender === 'BOY')
+                        .every(card => card.style.backgroundColor === 'white');
+
+                    if (revealedBoys) {
+                        message.innerText = '¡Es un niño!';
+                        message.style.display = 'block';
+                    }
+                }
+            };
+
+            scratchCards.forEach((card) => {
                 const ctx = card.getContext('2d');
+                const gender = card.dataset.gender;
 
-                // Fill the canvas with a solid color
                 ctx.fillStyle = '#808080';
                 ctx.fillRect(0, 0, card.width, card.height);
 
-                // Draw the hidden text
-                ctx.font = '20px Arial';
-                ctx.fillStyle = 'blue';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(genders[index], card.width / 2, card.height / 2);
-
-                // Save the text in a separate canvas for easier manipulation
                 const hiddenCanvas = document.createElement('canvas');
                 hiddenCanvas.width = card.width;
                 hiddenCanvas.height = card.height;
@@ -65,55 +106,28 @@
                 hiddenCtx.fillStyle = 'blue';
                 hiddenCtx.textAlign = 'center';
                 hiddenCtx.textBaseline = 'middle';
-                hiddenCtx.fillText(genders[index], card.width / 2, card.height / 2);
+                hiddenCtx.fillText(gender, card.width / 2, card.height / 2);
+                card.hiddenCanvas = hiddenCanvas;
 
-                const startDrawing = () => isDrawing = true;
-                const endDrawing = () => {
-                    isDrawing = false;
-                    ctx.beginPath();
+                card.startDrawing = (event) => {
+                    event.preventDefault();
+                    startDrawing();
                 };
 
-                const draw = (event) => {
-                    if (!isDrawing) return;
-                    ctx.globalCompositeOperation = 'destination-out';
-                    ctx.lineWidth = 15;
-                    ctx.lineCap = 'round';
-                    ctx.strokeStyle = 'rgba(0,0,0,1)';
+                card.endDrawing = () => endDrawing(ctx);
 
-                    const rect = card.getBoundingClientRect();
-                    ctx.lineTo(event.clientX - rect.left, event.clientY - rect.top);
-                    ctx.stroke();
-                    ctx.beginPath();
-                    ctx.moveTo(event.clientX - rect.left, event.clientY - rect.top);
-
-                    // Check if the revealed area is more than 50%
-                    const imageData = ctx.getImageData(0, 0, card.width, card.height);
-                    let revealedPixels = 0;
-                    for (let i = 0; i < imageData.data.length; i += 4) {
-                        if (imageData.data[i + 3] === 0) revealedPixels++;
-                    }
-
-                    if (revealedPixels / (card.width * card.height) > 0.5) {
-                        card.removeEventListener('mousedown', startDrawing);
-                        card.removeEventListener('mouseup', endDrawing);
-                        card.removeEventListener('mousemove', draw);
-                        card.removeEventListener('mouseout', endDrawing);
-
-                        const revealedBoys = Array.from(scratchCards)
-                            .filter(card => card.dataset.gender === 'BOY')
-                            .every(card => card.style.backgroundColor === 'white');
-
-                        if (revealedBoys) {
-                            message.innerText = '¡Es un niño!';
-                            message.style.display = 'block';
-                        }
-                    }
+                card.draw = (event) => {
+                    event.preventDefault();
+                    draw(event, ctx, card);
                 };
 
-                card.addEventListener('mousedown', startDrawing);
-                card.addEventListener('mouseup', endDrawing);
-                card.addEventListener('mousemove', draw);
-                card.addEventListener('mouseout', endDrawing);
+                card.addEventListener('mousedown', card.startDrawing);
+                card.addEventListener('mouseup', card.endDrawing);
+                card.addEventListener('mousemove', card.draw);
+                card.addEventListener('mouseout', card.endDrawing);
+                card.addEventListener('touchstart', card.startDrawing);
+                card.addEventListener('touchend', card.endDrawing);
+                card.addEventListener('touchmove', card.draw);
             });
         });
 
