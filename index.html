@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Scratch & Match</title>
+        <link rel="stylesheet" href="styles.css">
+    </head>
+
+    <body>
+        <h1>Raspa para Revelar el Género del Bebé</h1>
+        <div id="scratch">
+            <canvas class="scratch-card-1" id="cardf-0" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card-2" id="cardf-1" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card-3" id="cardf-2" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card-4" id="cardf-3" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card-5" id="cardf-4" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card-6" id="cardf-5" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card-7" id="cardf-6" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card-8" id="cardf-7" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card-9" id="cardf-8" width="100" height="100" data-gender=""></canvas>
+        </div>
+        <div id="scratch-area">
+            <canvas class="scratch-card" id="card-0" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card" id="card-1" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card" id="card-2" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card" id="card-3" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card" id="card-4" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card" id="card-5" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card" id="card-6" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card" id="card-7" width="100" height="100" data-gender=""></canvas>
+            <canvas class="scratch-card" id="card-8" width="100" height="100" data-gender=""></canvas>
+        </div>
+        <div id="message"></div>
+    </body>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const scratchCards = document.querySelectorAll('.scratch-card');
+            const message = document.getElementById('message');
+            let isDrawing = false;
+
+            const genders = Array.from(scratchCards).map(card => card.dataset.gender || "");
+
+            scratchCards.forEach((card, index) => {
+                const ctx = card.getContext('2d');
+
+                // Fill the canvas with a solid color
+                ctx.fillStyle = '#808080';
+                ctx.fillRect(0, 0, card.width, card.height);
+
+                // Draw the hidden text
+                ctx.font = '20px Arial';
+                ctx.fillStyle = 'blue';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(genders[index], card.width / 2, card.height / 2);
+
+                // Save the text in a separate canvas for easier manipulation
+                const hiddenCanvas = document.createElement('canvas');
+                hiddenCanvas.width = card.width;
+                hiddenCanvas.height = card.height;
+                const hiddenCtx = hiddenCanvas.getContext('2d');
+                hiddenCtx.font = '20px Arial';
+                hiddenCtx.fillStyle = 'blue';
+                hiddenCtx.textAlign = 'center';
+                hiddenCtx.textBaseline = 'middle';
+                hiddenCtx.fillText(genders[index], card.width / 2, card.height / 2);
+
+                const startDrawing = () => isDrawing = true;
+                const endDrawing = () => {
+                    isDrawing = false;
+                    ctx.beginPath();
+                };
+
+                const draw = (event) => {
+                    if (!isDrawing) return;
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.lineWidth = 15;
+                    ctx.lineCap = 'round';
+                    ctx.strokeStyle = 'rgba(0,0,0,1)';
+
+                    const rect = card.getBoundingClientRect();
+                    ctx.lineTo(event.clientX - rect.left, event.clientY - rect.top);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(event.clientX - rect.left, event.clientY - rect.top);
+
+                    // Check if the revealed area is more than 50%
+                    const imageData = ctx.getImageData(0, 0, card.width, card.height);
+                    let revealedPixels = 0;
+                    for (let i = 0; i < imageData.data.length; i += 4) {
+                        if (imageData.data[i + 3] === 0) revealedPixels++;
+                    }
+
+                    if (revealedPixels / (card.width * card.height) > 0.5) {
+                        card.removeEventListener('mousedown', startDrawing);
+                        card.removeEventListener('mouseup', endDrawing);
+                        card.removeEventListener('mousemove', draw);
+                        card.removeEventListener('mouseout', endDrawing);
+
+                        const revealedBoys = Array.from(scratchCards)
+                            .filter(card => card.dataset.gender === 'BOY')
+                            .every(card => card.style.backgroundColor === 'white');
+
+                        if (revealedBoys) {
+                            message.innerText = '¡Es un niño!';
+                            message.style.display = 'block';
+                        }
+                    }
+                };
+
+                card.addEventListener('mousedown', startDrawing);
+                card.addEventListener('mouseup', endDrawing);
+                card.addEventListener('mousemove', draw);
+                card.addEventListener('mouseout', endDrawing);
+            });
+        });
+
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #b6ece8;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            text-align: center;
+            position: fixed;
+        }
+
+        #scratch-area {
+            position: absolute;
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-template-rows: repeat(3, 100px);
+            gap: 10px;
+        }
+
+        #scratch {
+            margin-top: 0px;
+            position: absolute;
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-template-rows: repeat(3, 100px);
+            gap: 10px;
+        }
+
+        .scratch-card {
+            border-radius: 50%;
+            cursor: crosshair;
+        }
+
+        .scratch-card-1,
+        .scratch-card-5,
+        .scratch-card-7,
+        .scratch-card-9 {
+            border-radius: 50%;
+            cursor: crosshair;
+            background: rgba(238, 238, 241, 0.184);
+            background-image: url(2.png);
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+
+        }
+
+        .scratch-card-2,
+        .scratch-card-3,
+        .scratch-card-4,
+        .scratch-card-6,
+        .scratch-card-8 {
+            border-radius: 50%;
+            cursor: crosshair;
+            background: rgba(238, 238, 241, 0.184);
+            background-image: url(1.png);
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+
+        }
+
+        #message {
+            margin-top: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            color: blue;
+            display: none;
+        }
+    </style>
+
+</html>
